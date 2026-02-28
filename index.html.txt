@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sunset Quality Predictor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;600;800&display=swap');
+        
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            margin: 0;
+            overflow-x: hidden;
+            background-color: #0f172a; /* Fons fosc per defecte */
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .sun-arc {
+            stroke-dasharray: 2, 2;
+        }
+
+        .transition-bg {
+            transition: background 1.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="transition-bg min-h-screen flex items-center justify-center p-4">
+
+    <div id="app" class="w-full max-w-md glass rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col text-white opacity-0 transition-opacity duration-700">
+        
+        <!-- Cercador -->
+        <div class="p-6 pb-2">
+            <div class="flex items-center bg-white/10 rounded-2xl px-4 py-2 border border-white/10">
+                <i data-lucide="search" class="w-5 h-5 text-white/60"></i>
+                <input 
+                    type="text" 
+                    id="search-input"
+                    placeholder="Cerca la teva zona..." 
+                    class="bg-transparent border-none outline-none flex-1 px-3 text-sm placeholder:text-white/40 text-white"
+                />
+                <div id="loader" class="hidden">
+                    <i data-lucide="loader-2" class="w-4 h-4 animate-spin text-white/60"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Calendari -->
+        <div id="calendar" class="px-6 py-2 flex gap-3 overflow-x-auto no-scrollbar">
+            <!-- Es genera amb JS -->
+        </div>
+
+        <!-- Contingut Principal -->
+        <div class="flex-1 px-8 py-4 flex flex-col items-center text-center">
+            <div class="flex items-center gap-2 mb-1 opacity-80">
+                <i data-lucide="map-pin" class="w-4 h-4"></i>
+                <span id="location-name" class="text-sm font-medium">Barcelona</span>
+            </div>
+            
+            <div class="relative mb-4">
+                <h2 id="quality-percent" class="text-8xl font-black tracking-tighter">--%</h2>
+                <p class="text-sm font-bold uppercase tracking-widest opacity-70">Qualitat del Capvespre</p>
+            </div>
+
+            <!-- Arc Solar -->
+            <div class="relative w-full h-40 mt-4 overflow-hidden">
+                <svg viewBox="0 0 100 100" class="w-full h-full">
+                    <path d="M 5 80 A 45 45 0 0 1 95 80" fill="none" stroke="white" stroke-width="0.5" class="sun-arc opacity-30"/>
+                    <circle id="sun-icon" cx="50" cy="80" r="4" fill="#fbbf24" class="filter drop-shadow-[0_0_8px_rgba(251,191,36,0.8)]" />
+                    <line x1="0" y1="80" x2="100" y2="80" stroke="white" stroke-width="0.2" class="opacity-20" />
+                </svg>
+                <div class="absolute bottom-4 w-full flex justify-between px-2 text-[10px] font-bold opacity-50 uppercase tracking-tighter">
+                    <span>Sortida</span>
+                    <span>Posta</span>
+                </div>
+            </div>
+
+            <!-- Dades Posta -->
+            <div class="grid grid-cols-2 gap-4 w-full mt-4">
+                <div class="bg-white/10 p-4 rounded-3xl border border-white/5">
+                    <p class="text-[10px] uppercase opacity-50 font-bold mb-1">Posta de Sol</p>
+                    <p id="sunset-time" class="text-xl font-bold">--:--</p>
+                </div>
+                <div class="bg-white/10 p-4 rounded-3xl border border-white/5">
+                    <p class="text-[10px] uppercase opacity-50 font-bold mb-1">Golden Hour</p>
+                    <p id="golden-hour" class="text-xl font-bold">--:--</p>
+                </div>
+            </div>
+
+            <!-- Detalls -->
+            <div class="flex justify-around w-full mt-6 py-4 border-y border-white/10">
+                <div class="flex flex-col items-center gap-1">
+                    <i data-lucide="cloud" class="w-5 h-5 text-blue-200"></i>
+                    <span id="val-clouds" class="text-xs font-bold">--%</span>
+                    <span class="text-[8px] opacity-50 uppercase">Núvols</span>
+                </div>
+                <div class="flex flex-col items-center gap-1">
+                    <i data-lucide="eye" class="w-5 h-5 text-green-200"></i>
+                    <span id="val-visibility" class="text-xs font-bold">--%</span>
+                    <span class="text-[8px] opacity-50 uppercase">Visibilitat</span>
+                </div>
+                <div class="flex flex-col items-center gap-1">
+                    <i data-lucide="droplets" class="w-5 h-5 text-cyan-200"></i>
+                    <span id="val-humidity" class="text-xs font-bold">--%</span>
+                    <span class="text-[8px] opacity-50 uppercase">Humitat</span>
+                </div>
+            </div>
+
+            <!-- Consells -->
+            <div class="mt-6 w-full text-left bg-black/20 p-4 rounded-3xl border border-white/10">
+                <div class="flex items-center gap-2 mb-2 text-orange-300">
+                    <i data-lucide="camera" class="w-4 h-4"></i>
+                    <span class="text-xs font-bold uppercase">Consells per a fotògrafs</span>
+                </div>
+                <p id="photo-tips" class="text-xs leading-relaxed opacity-90">
+                    Carregant dades del temps...
+                </p>
+            </div>
+
+            <button id="share-btn" class="mt-6 mb-4 flex items-center gap-2 bg-white text-slate-900 px-8 py-3 rounded-full font-bold text-sm hover:scale-105 transition-transform active:scale-95">
+                <i data-lucide="share-2" class="w-4 h-4"></i>
+                Comparteix el pronòstic
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const apiKey = ""; // La clau s'injecta automàticament en l'entorn
+        let currentData = null;
+        let selectedDayIdx = 0;
+        let currentLocation = "Barcelona";
+
+        // Inicialitzar Icones
+        lucide.createIcons();
+
+        // Generar Calendari
+        const renderCalendar = () => {
+            const calendarEl = document.getElementById('calendar');
+            calendarEl.innerHTML = '';
+            const names = ['Dg', 'Dl', 'Dt', 'Dc', 'Dj', 'Dv', 'Ds'];
+            
+            for (let i = 0; i < 7; i++) {
+                const d = new Date();
+                d.setDate(d.getDate() + i);
+                const isSelected = i === selectedDayIdx;
+                
+                const btn = document.createElement('button');
+                btn.className = `flex-shrink-0 flex flex-col items-center justify-center w-14 h-20 rounded-2xl transition-all ${
+                    isSelected ? 'bg-white text-orange-600 shadow-lg scale-105' : 'bg-white/5 hover:bg-white/10'
+                }`;
+                btn.onclick = () => {
+                    selectedDayIdx = i;
+                    renderCalendar();
+                    fetchData(currentLocation);
+                };
+                
+                btn.innerHTML = `
+                    <span class="text-[10px] uppercase font-bold ${isSelected ? 'opacity-100' : 'opacity-40'}">${i === 0 ? 'Avui' : names[d.getDay()]}</span>
+                    <span class="text-lg font-bold">${d.getDate()}</span>
+                `;
+                calendarEl.appendChild(btn);
+            }
+        };
+
+        const calculateQuality = (data) => {
+            let score = 0;
+            const clouds = data.clouds;
+            if (clouds >= 30 && clouds <= 50) score += 50;
+            else if (clouds < 30) score += (clouds / 30) * 40;
+            else if (clouds > 50) score += Math.max(0, 50 - (clouds - 50));
+            score += (data.visibility / 100) * 25;
+            score += ((100 - data.humidity) / 100) * 25;
+            return Math.round(score);
+        };
+
+        const updateUI = (data) => {
+            const quality = calculateQuality(data);
+            document.getElementById('quality-percent').innerText = `${quality}%`;
+            document.getElementById('location-name').innerText = data.city;
+            document.getElementById('sunset-time').innerText = data.sunsetTime;
+            document.getElementById('golden-hour').innerText = data.goldenHour;
+            document.getElementById('val-clouds').innerText = `${data.clouds}%`;
+            document.getElementById('val-visibility').innerText = `${data.visibility}%`;
+            document.getElementById('val-humidity').innerText = `${data.humidity}%`;
+
+            // Fons dinàmic
+            let bgClass = 'from-slate-700 via-blue-800 to-slate-900';
+            if (quality > 75) bgClass = 'from-orange-500 via-pink-500 to-purple-700';
+            else if (quality > 45) bgClass = 'from-blue-400 via-orange-300 to-pink-400';
+            
+            document.body.className = `transition-bg min-h-screen flex items-center justify-center p-4 bg-gradient-to-br ${bgClass}`;
+
+            // Consells
+            let tips = "Llum suau però poc color. Ideal per a retrats o blanc i negre.";
+            if (quality > 80) tips = "Cels èpics! Utilitza un gran angular. Colors intensos 15 min després de la posta.";
+            else if (quality > 50) tips = "Bones condicions. Busca reflexos en aigua o vidres per potenciar els tons.";
+            document.getElementById('photo-tips').innerText = tips;
+
+            // Posició Sol
+            const now = new Date();
+            const hours = now.getHours() + now.getMinutes() / 60;
+            const progress = Math.max(0, Math.min(1, (hours - 6) / (19 - 6)));
+            const angle = Math.PI + progress * Math.PI;
+            const x = 50 + 45 * Math.cos(angle);
+            const y = 80 + 45 * Math.sin(angle);
+            const sunIcon = document.getElementById('sun-icon');
+            sunIcon.setAttribute('cx', x);
+            sunIcon.setAttribute('cy', y);
+
+            document.getElementById('app').classList.remove('opacity-0');
+        };
+
+        const fetchData = async (city) => {
+            const loader = document.getElementById('loader');
+            loader.classList.remove('hidden');
+            
+            const d = new Date();
+            d.setDate(d.getDate() + selectedDayIdx);
+            const dateStr = d.toLocaleDateString('ca-ES', { day: 'numeric', month: 'short' });
+
+            try {
+                const systemPrompt = `Expert meteoròleg. Dona dades de posta de sol en JSON: { "city": "Nom", "sunsetTime": "HH:MM", "goldenHour": "HH:MM", "clouds": 0-100, "humidity": 0-100, "visibility": 0-100 }`;
+                const userPrompt = `Dades per a ${city} el dia ${dateStr}`;
+
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: userPrompt }] }],
+                        systemInstruction: { parts: [{ text: systemPrompt }] },
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+
+                const resData = await response.json();
+                const result = JSON.parse(resData.candidates[0].content.parts[0].text);
+                currentData = result;
+                currentLocation = result.city;
+                updateUI(result);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                loader.classList.add('hidden');
+            }
+        };
+
+        // Events
+        document.getElementById('search-input').onkeydown = (e) => {
+            if (e.key === 'Enter') fetchData(e.target.value);
+        };
+
+        document.getElementById('share-btn').onclick = () => {
+            const text = `La qualitat del capvespre a ${currentLocation} serà del ${calculateQuality(currentData)}%! 🌅`;
+            if (navigator.share) {
+                navigator.share({ title: 'Sunset Quality', text, url: window.location.href });
+            } else {
+                navigator.clipboard.writeText(text);
+                alert('Copiat al porta-retalls!');
+            }
+        };
+
+        // Init
+        window.onload = () => {
+            renderCalendar();
+            fetchData(currentLocation);
+        };
+    </script>
+</body>
+</html>
